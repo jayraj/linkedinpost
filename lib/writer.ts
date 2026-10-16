@@ -17,6 +17,7 @@ export async function writePost(topic: Topic, feedback?: string): Promise<string
   const { text } = await generateText({
     model: llm(),
     system: SYSTEM,
+    maxRetries: 4, // ride out Gemini "high demand" 503 spikes (default = 2)
     prompt: `Author profile (content DNA):
 - Personal story: ${CONTENT_DNA.personalStory}
 - Service to promote: ${CONTENT_DNA.service.name} — ${CONTENT_DNA.service.blurb} (CTA link: ${CONTENT_DNA.service.ctaUrl})

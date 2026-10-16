@@ -13,6 +13,18 @@ function cronAuth(req: NextRequest): boolean {
   return auth === `Bearer ${secret}`;
 }
 
+// Full function budget (seconds): pipeline (~60-110s) + one 60s-cooled retry
+export const maxDuration = 300;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Scout + write as one unit so a mid-pipeline capacity spike can be retried whole. */
+async function scoutAndWrite(): Promise<{ topics: Topic[]; content: string }> {
+  const topics = await scoutTopics();
+  const content = await writePost(topics[0]);
+  return { topics, content };
+}
+
 // Vercel cron invokes routes with GET; POST kept for manual triggers (curl/tests).
 async function handle(req: NextRequest) {
   if (!cronAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -26,11 +38,21 @@ async function handle(req: NextRequest) {
       return NextResponse.json({ ok: true, duplicate: true, draftId: existing.id });
     }
 
-    // 1. Scout topics (agentic)
-    const topics: Topic[] = await scoutTopics();
+    // 1+2. Scout topics (agentic) + write — one cooled retry if a capacity
+    // spike (Gemini 503 "high demand") kills the first attempt. Bounded so
+    // the retry never starts when there isn't budget left before maxDuration.
+    const started = Date.now();
+    let out: { topics: Topic[]; content: string };
+    try {
+      out = await scoutAndWrite();
+    } catch (e) {
+      if (Date.now() - started > 150_000) throw e; // too late to retry safely
+      await sleep(60_000); // let the spike pass
+      out = await scoutAndWrite();
+    }
+    const topics = out.topics;
     const chosen = topics[0];
-    // 2. Write post
-    const content = await writePost(chosen);
+    const content = out.content;
     // 3. Draft + tokens
     const tokenExpires = new Date(Date.now() + 7 * 24 * 3600_000);
     const draft = await createDraft({ weekOf, topics, chosenTopic: chosen.title, content, tokenExpires });

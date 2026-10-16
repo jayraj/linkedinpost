@@ -19,6 +19,7 @@ export async function scoutTopics(): Promise<Topic[]> {
   const { text } = await generateText({
     model: llm(),
     system: SYSTEM,
+    maxRetries: 4, // ride out Gemini "high demand" 503 spikes (default = 2)
     prompt: `Research trending topics in Agile project management for the week of ${new Date().toISOString().slice(0, 10)}.
 Run as many searches as you need (try: "agile trends this week", "scrum news", "project management debate",
 relevant subreddit/industry news). Then output your final answer as STRICT JSON only — no prose, no markdown fence:
