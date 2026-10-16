@@ -13,7 +13,8 @@ function cronAuth(req: NextRequest): boolean {
   return auth === `Bearer ${secret}`;
 }
 
-export async function POST(req: NextRequest) {
+// Vercel cron invokes routes with GET; POST kept for manual triggers (curl/tests).
+async function handle(req: NextRequest) {
   if (!cronAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const weekOf = currentMonday();
@@ -44,4 +45,12 @@ export async function POST(req: NextRequest) {
     await sendAlertEmail('weekly pipeline failed', e);
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
+}
+
+export async function GET(req: NextRequest) {
+  return handle(req);
+}
+
+export async function POST(req: NextRequest) {
+  return handle(req);
 }
