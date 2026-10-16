@@ -1,28 +1,28 @@
 /**
  * CONTENT DNA — the AI writes in YOUR voice using this profile.
- *
- * ⚠️  TBD PLACEHOLDERS — fill these in before go-live (Phase 0, plan §11)!
- *     Until they're filled, generated drafts will contain visible [TBD] markers.
+ * (Filled in — tweak anything here and push; the next draft picks it up.)
  */
 export const CONTENT_DNA = {
   /** 1–2 sentences: a real Agile moment from your experience the posts draw from. */
   personalStory:
-    '[TBD — personal Agile story: e.g. "Led a program where we cut release cycles from quarterly to bi-weekly by killing status meetings and shipping small."]',
+    'Our releases were quarterly and always slipped. I killed two status meetings, split the work into two-week slices, and within a month we were shipping bi-weekly — same team, same budget, fewer headaches.',
 
   /** What you promote + where the CTA points. */
   service: {
-    name: '[TBD — company/service name]',
-    blurb: '[TBD — one line: what it does / who it helps]',
-    ctaUrl: '[TBD — https:// link]',
+    name: 'Author’s personal brand — no client service yet',
+    blurb:
+      'Soft CTA: invite readers to follow the author for one sharp, practical Agile take every week — no product pitch',
+    ctaUrl:
+      'none — use a text-only CTA such as "Follow me for weekly Agile takes" (replace this with your real service + https:// link when you have one)',
   },
 
   /** The sharp, contrarian, exec-facing take that anchors your point of view. */
-  signatureOpinion: '[TBD — e.g. "Agile isn\'t about going faster — it\'s about failing cheaper."]',
+  signatureOpinion: 'Most teams don’t have an Agile problem — they have a courage problem.',
 
   /** Post sign-off. */
   signOff: {
-    name: '[TBD — your name]',
-    title: '[TBD — your title]',
+    name: 'Jayraj Bhatta',
+    title: 'Engineering Manager specializing in Agile delivery',
   },
 
   audience: 'Leadership / executives',
