@@ -21,7 +21,7 @@ async function handle(req: NextRequest) {
   try {
     // Guard: avoid double-run in the same week (idempotent by week)
     const existing = await getDraftForWeek(weekOf);
-    if (existing && (existing.status === 'pending' || existing.status === 'approved')) {
+    if (existing && (existing.status === 'pending' || existing.status === 'approved' || existing.status === 'posted')) {
       await logAction(existing.id, 'skipped_duplicate', { weekOf, status: existing.status });
       return NextResponse.json({ ok: true, duplicate: true, draftId: existing.id });
     }
@@ -42,7 +42,11 @@ async function handle(req: NextRequest) {
     await logAction(draft.id, 'emailed', { dryRun: isDryRun(), links: { ...links, feedback: '[redacted]' } });
     return NextResponse.json({ ok: true, draftId: draft.id, weekOf });
   } catch (e) {
-    await sendAlertEmail('weekly pipeline failed', e);
+    // Always leave a DB trace, even if the alert email itself fails
+    await logAction(null, 'failed', { weekOf, error: String(e) }).catch(() => {});
+    try {
+      await sendAlertEmail('weekly pipeline failed', e);
+    } catch {}
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }
