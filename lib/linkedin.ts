@@ -1,7 +1,6 @@
 import { db, logAction } from './db';
 import { baseUrl, env, isDryRun } from './env';
 import { sendAlertEmail } from './email';
-import type { PostImage } from './image';
 
 const API = 'https://api.linkedin.com';
 const TOKEN_URL = `${API}/oauth/v2/accessToken`;
@@ -66,52 +65,15 @@ export async function tokenDaysLeft(): Promise<number> {
   return Math.floor((t.expiresAt.getTime()-Date.now())/86400000);
 }
 
-/**
- * LinkedIn Images API upload: initializeUpload → PUT bytes → asset URN.
- * (Images API has no synchronous mode; callers should let the asset settle
- * briefly before referencing it in a post.)
- */
-async function uploadImageToLinkedIn(accessToken: string, ownerUrn: string, img: PostImage): Promise<string> {
-  const version = env('LINKEDIN_API_VERSION', '202506');
-  const initRes = await fetch(`${API}/rest/images?action=initializeUpload`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${accessToken}`, 'LinkedIn-Version': version, 'X-Restli-Protocol-Version': '2.0.0', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initializeUploadRequest: { owner: ownerUrn } }),
-    signal: AbortSignal.timeout(20000),
-  });
-  if (!initRes.ok) throw new Error(`LinkedIn initializeUpload ${initRes.status}: ${(await initRes.text()).slice(0, 400)}`);
-  const init = (await initRes.json()) as any;
-  const uploadUrl = init?.value?.uploadUrl as string | undefined;
-  const imageUrn = init?.value?.image as string | undefined;
-  if (!uploadUrl || !imageUrn) throw new Error(`LinkedIn initializeUpload bad response: ${JSON.stringify(init).slice(0, 400)}`);
-
-  const putRes = await fetch(uploadUrl, {
-    method: 'PUT',
-    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': img.mimeType },
-    body: Buffer.from(img.base64, 'base64'),
-    signal: AbortSignal.timeout(30000),
-  });
-  if (!putRes.ok) throw new Error(`LinkedIn image upload ${putRes.status}: ${(await putRes.text()).slice(0, 400)}`);
-  return imageUrn;
-}
-
-export async function postToLinkedIn(content: string, draftId: string, opts?: { image?: PostImage | null; altText?: string }): Promise<{ posted: boolean; id?: string }> {
-  if (isDryRun()) { await logAction(draftId,'dry_run',{contentLength: content.length, image: opts?.image ? 'would_upload' : 'none'}); return { posted: false }; }
+export async function postToLinkedIn(content: string, draftId: string): Promise<{ posted: boolean; id?: string }> {
+  if (isDryRun()) { await logAction(draftId,'dry_run',{contentLength: content.length}); return { posted: false }; }
   const token = await validAccessToken();
   const personUrn = (await getTokens()).personUrn;
   const version = env('LINKEDIN_API_VERSION','202506');
-  const body: Record<string, unknown> = { author: personUrn, commentary: content, visibility: 'PUBLIC', distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] }, lifecycleState: 'PUBLISHED', isReshareDisabledByAuthor: false };
-  if (opts?.image) {
-    const imageUrn = await uploadImageToLinkedIn(token, personUrn, opts.image);
-    // Uploads are async — give the asset a moment before the post references it.
-    await new Promise((r) => setTimeout(r, 3000));
-    body.content = { media: { id: imageUrn, altText: (opts.altText || content.split('\n').filter(Boolean)[0] || 'Post illustration').slice(0, 200) } };
-    await logAction(draftId, 'image_uploaded', { imageUrn, mime: opts.image.mimeType });
-  }
   const res = await fetch(`${API}/rest/posts`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'LinkedIn-Version': version, 'X-Restli-Protocol-Version': '2.0.0', 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ author: personUrn, commentary: content, visibility: 'PUBLIC', distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] }, lifecycleState: 'PUBLISHED', isReshareDisabledByAuthor: false }),
     signal: AbortSignal.timeout(20000),
   });
   if (!res.ok) { const body = await res.text(); await logAction(draftId,'failed',{status: res.status, body}); await sendAlertEmail(`LinkedIn post failed (${res.status})`, new Error(body)); throw new Error(`LinkedIn API ${res.status}: ${body}`); }
