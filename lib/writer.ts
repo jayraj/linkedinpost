@@ -1,30 +1,50 @@
 import { generateText } from 'ai';
-import { CONTENT_DNA } from './content-dna';
+import { LINKEDIN_AUTHOR_PROFILE } from './content-dna';
 import type { Topic } from './db';
 import { llm } from './llm';
 
-const SYSTEM = `You write high-performing LinkedIn posts for an executive audience.
+const P = LINKEDIN_AUTHOR_PROFILE;
+
+const SYSTEM = `You write high-performing LinkedIn posts for an executive audience,
+in first person as ${P.author.name} (${P.author.role}).
+
+Post structure — follow in order:
+1. Hook — ${P.framework.hook}
+2. Context — ${P.framework.context}
+3. Insight — ${P.framework.insight}
+4. Takeaway — ${P.framework.takeaway}
+5. Closing — ${P.framework.closing}
+
 Rules:
-- ~150 words total (HARD cap 160). Short lines. Line breaks between short paragraphs.
-- Structure: [scroll-stopping hook in line 1] → [personal story with concrete specifics] →
-  [insight anchored in the chosen opinion] → [one clear CTA].
-- Tone: confident, plain English, zero corporate filler, no "delve/unlock/leverage" buzzwords.
-- Max 3 hashtags at the very end. No emojis except at most one in the hook.
-- Never mention that you are AI. Write in first person as the author.
-- The [TBD] markers from the author profile must be woven in literally as written if not yet replaced.`;
+- Length: ${P.writingStyle.wordCount} words, readable in ${P.writingStyle.readingTime}.
+- ${P.writingStyle.paragraphs} Line breaks between short paragraphs.
+- Tone: ${P.writingStyle.tone} ${P.writingStyle.language}
+- Personality: ${P.writingStyle.personality.join(', ')}. Confident, zero corporate filler, no "delve/unlock/leverage" buzzwords.
+- Emojis: ${P.writingStyle.emojis}
+- ${P.writingStyle.hashtags} Hashtags go at the very end.
+- ${P.engagement.defaultEnding}s work best as endings. ${P.engagement.followFrequency}
+- Writing rules: ${P.writingRules.join(' | ')}
+- Never write: ${P.neverWrite.join(' | ')}
+- Never mention that you are AI.
+- Mentally run this checklist before outputting: ${P.qualityChecklist.join(' | ')}`;
 
 export async function writePost(topic: Topic, feedback?: string): Promise<string> {
   const { text } = await generateText({
     model: llm(),
     system: SYSTEM,
     maxRetries: 4, // ride out Gemini "high demand" 503 spikes (default = 2)
-    prompt: `Author profile (content DNA):
-- Personal story: ${CONTENT_DNA.personalStory}
-- Service to promote: ${CONTENT_DNA.service.name} — ${CONTENT_DNA.service.blurb} (CTA link: ${CONTENT_DNA.service.ctaUrl})
-- Signature opinion: ${CONTENT_DNA.signatureOpinion}
-- Sign-off: ${CONTENT_DNA.signOff.name}, ${CONTENT_DNA.signOff.title}
-- Audience: ${CONTENT_DNA.audience}
-- Tone: ${CONTENT_DNA.tone}
+    prompt: `Author profile:
+- Author: ${P.author.name}, ${P.author.role}
+- Positioning: ${P.author.positioning}
+- Real experiences (rotate naturally, never invent stories): ${P.experienceBank.join(' | ')}
+- Core beliefs (choose ONE per post): ${P.coreBeliefs.join(' | ')}
+- AI perspective: ${P.aiPerspective.join(' | ')}
+- Content pillars (rotate): ${P.contentPillars.join(' | ')}
+- Post types (rotate): ${P.postTypes.join(' | ')}
+- Audience: ${[...P.audience.primary, ...P.audience.secondary].join(', ')}
+- Reader goals: ${P.audience.readerGoals.join(', ')}
+- Closing options (pick one that fits): ${P.engagement.closingOptions.join(' | ')}
+- Sign-off: ${P.author.name}, ${P.author.role}
 
 Topic for this week's post:
 - Title: ${topic.title}

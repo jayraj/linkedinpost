@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import { CONTENT_DNA } from './content-dna';
+import { LINKEDIN_AUTHOR_PROFILE } from './content-dna';
 import type { Draft, Topic } from './db';
 import { baseUrl, env } from './env';
 
@@ -127,4 +127,4 @@ export async function buildLinks(draft: Draft, tokens: { approve: string; feedba
   };
 }
 
-export const signOff = `${CONTENT_DNA.signOff.name} — ${CONTENT_DNA.signOff.title}`;
+export const signOff = `${LINKEDIN_AUTHOR_PROFILE.author.name} — ${LINKEDIN_AUTHOR_PROFILE.author.role}`;
