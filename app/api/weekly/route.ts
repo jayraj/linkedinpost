@@ -4,6 +4,7 @@ import { sendAlertEmail, sendDraftEmail, buildLinks } from '@/lib/email';
 import { signActionToken } from '@/lib/tokens';
 import { scoutTopics } from '@/lib/scout';
 import { writePost } from '@/lib/writer';
+import { generatePostImage, postHook } from '@/lib/image';
 import { baseUrl, env, isDryRun } from '@/lib/env';
 
 function cronAuth(req: NextRequest): boolean {
@@ -53,15 +54,18 @@ async function handle(req: NextRequest) {
     const topics = out.topics;
     const chosen = topics[0];
     const content = out.content;
+    // 2b. Image for the post — never fatal: failed generation → text-only week
+    const image = await generatePostImage(chosen.title, postHook(content, chosen.title));
     // 3. Draft + tokens
     const tokenExpires = new Date(Date.now() + 7 * 24 * 3600_000);
-    const draft = await createDraft({ weekOf, topics, chosenTopic: chosen.title, content, tokenExpires });
+    const draft = await createDraft({ weekOf, topics, chosenTopic: chosen.title, content, tokenExpires,
+      imageData: image?.base64 ?? null, imageMime: image?.mimeType ?? null, imageStatus: image ? 'generated' : 'failed' });
     const approve = await signActionToken(draft.id, 'approve');
     const feedback = await signActionToken(draft.id, 'feedback');
     const links = await buildLinks(draft, { approve, feedback });
     // 4. Email
     await sendDraftEmail(draft, links);
-    await logAction(draft.id, 'emailed', { dryRun: isDryRun(), links: { ...links, feedback: '[redacted]' } });
+    await logAction(draft.id, 'emailed', { dryRun: isDryRun(), image: draft.image_status, links: { ...links, feedback: '[redacted]' } });
     return NextResponse.json({ ok: true, draftId: draft.id, weekOf });
   } catch (e) {
     // Always leave a DB trace, even if the alert email itself fails

@@ -22,6 +22,16 @@ Go to `/api/oauth/start` to connect/re-connect LinkedIn. The callback persists t
 ## Content DNA
 Edit `lib/content-dna.ts` with your 4 bullets before going live.
 
+## Post images
+Every draft ships with an AI-generated square illustration (light & corporate
+visual DNA), previewed inline in the approval email and published with the post.
+- Default engine: [Pollinations.ai](https://pollinations.ai) — free, keyless; the
+  free-tier watermark is cropped off in code (`lib/image.ts`).
+- Optional upgrade: set `IMAGE_PROVIDER=gemini` to use Gemini image models
+  (requires billing on the AI Studio project; falls back to Pollinations).
+- If image generation fails, the post still goes out text-only and the email flags it.
+- Schema columns: `drafts.image_data` (base64), `image_mime`, `image_status`.
+
 ## Go live
 1. Link GitHub repo to Vercel, set all env vars
 2. Deploy with `DRY_RUN=true`; test end-to-end (weekly + approve in dry-run)

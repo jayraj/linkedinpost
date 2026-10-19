@@ -8,6 +8,9 @@ CREATE TABLE IF NOT EXISTS drafts (
   chosen_topic  text NOT NULL,
   content       text NOT NULL,                       -- the LinkedIn post body
   status        text NOT NULL DEFAULT 'pending',     -- pending | approved | posted | expired | failed
+  image_data    text,                                -- base64 of the AI-generated post image
+  image_mime    text,                                -- image/png | image/jpeg
+  image_status  text NOT NULL DEFAULT 'none',        -- none | generated | failed
   token_expires timestamptz NOT NULL,                -- approval-link validity (7 days)
   created_at    timestamptz NOT NULL DEFAULT now(),
   updated_at    timestamptz NOT NULL DEFAULT now()

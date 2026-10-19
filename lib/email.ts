@@ -15,12 +15,15 @@ function transporter() {
   });
 }
 
-async function send(subject: string, html: string) {
+interface ImageAttachment { filename: string; cid: string; contentType: string; content: Buffer; }
+
+async function send(subject: string, html: string, attachments?: ImageAttachment[]) {
   await transporter().sendMail({
     from: `"Agile Post Agent" <${env('GMAIL_USER')}>`,
     to: env('EMAIL_TO', env('GMAIL_USER')),
     subject,
     html,
+    ...(attachments?.length ? { attachments } : {}),
   });
 }
 
@@ -36,6 +39,22 @@ const btn = (href: string, label: string, bg: string) =>
 
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/** Inline CID preview of the draft's generated image (+ attachment), or a fallback note. */
+function imageBlock(d: Draft): { html: string; attachments?: ImageAttachment[] } {
+  if (d.image_data && d.image_status === 'generated') {
+    const ext = (d.image_mime || '').includes('jpeg') ? 'jpg' : 'png';
+    return {
+      html: `<h3 style="font-size:15px;margin:20px 0 8px;color:#374151">🎨 Image that will publish with the post</h3>
+      <img src="cid:post-image" alt="Post illustration" style="display:block;width:100%;max-width:340px;border-radius:8px;border:1px solid #e5e7eb">`,
+      attachments: [{ filename: `post-image.${ext}`, cid: 'post-image', contentType: d.image_mime || 'image/png', content: Buffer.from(d.image_data, 'base64') }],
+    };
+  }
+  if (d.image_status === 'failed') {
+    return { html: `<p style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:8px 12px;font-size:13px;margin:16px 0 4px">🎨 <strong>No image this week</strong> — image generation failed, so this post will publish <strong>text-only</strong>.</p>` };
+  }
+  return { html: '' };
+}
 
 /** Weekly email: 3 suggestions + 1 ready draft + action buttons. */
 export async function sendDraftEmail(
@@ -53,6 +72,8 @@ export async function sendDraftEmail(
     )
     .join('');
 
+  const img = imageBlock(draft);
+
   await send(
     `🚀 Agile post ready — action needed (draft ${draft.id.slice(0, 8)})`,
     shell(
@@ -62,6 +83,7 @@ export async function sendDraftEmail(
       <ul style="padding-left:18px;margin:0 0 8px">${topicsList}</ul>
       <h3 style="font-size:15px;margin:20px 0 8px;color:#374151">✍️ Draft post (${esc(draft.chosen_topic)})</h3>
       <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;white-space:pre-wrap;font-size:14px;line-height:1.5">${esc(draft.content)}</div>
+      ${img.html}
       <p style="font-size:13px;color:#6b7280;margin:16px 0 4px">Approve, swap topic, or give feedback (links expire in 7 days):</p>
       ${btn(links.approve, '✅ Approve & Post', '#16a34a')}
       ${btn(links.pick2, '🔄 Try #2 instead', '#2563eb')}
@@ -70,17 +92,21 @@ export async function sendDraftEmail(
       ${process.env.DRY_RUN !== 'false' ? '<p style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:8px 12px;font-size:13px;margin-top:12px">🧪 <strong>DRY-RUN mode is ON</strong> — approving will simulate the post, not publish it. Set <code>DRY_RUN=false</code> in Vercel to go live.</p>' : ''}
       `,
     ),
+    img.attachments,
   );
 }
 
 export async function sendConfirmationEmail(draft: Draft, dryRun: boolean): Promise<void> {
+  const img = imageBlock(draft);
   await send(
     dryRun ? '🧪 Dry-run complete (nothing published)' : '✅ Your LinkedIn post is live',
     shell(
       dryRun ? 'Dry run succeeded' : 'Published to LinkedIn',
       `<p>${dryRun ? 'DRY-RUN mode: the pipeline approved and “posted” <strong>without</strong> calling LinkedIn.' : 'Your draft was posted to your LinkedIn feed.'}</p>
-       <blockquote style="border-left:3px solid #d1d5db;padding-left:12px;color:#4b5563;white-space:pre-wrap;font-size:14px">${esc(draft.content)}</blockquote>`,
+       <blockquote style="border-left:3px solid #d1d5db;padding-left:12px;color:#4b5563;white-space:pre-wrap;font-size:14px">${esc(draft.content)}</blockquote>
+       ${img.html}`,
     ),
+    img.attachments,
   );
 }
 
