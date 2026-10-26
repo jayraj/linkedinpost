@@ -17,6 +17,10 @@ export function rowToDraft(r: Record<string,unknown>): Draft {
   return { id: String(r.id), week_of: String(r.week_of), topics: parseTopics(r.topics), chosen_topic: String(r.chosen_topic), content: String(r.content), status: r.status as any, token_expires: String(r.token_expires), created_at: String(r.created_at), updated_at: String(r.updated_at) };
 }
 
+export async function listDrafts(): Promise<Draft[]> {
+  const res = await db()`SELECT * FROM drafts ORDER BY week_of DESC, created_at DESC`;
+  return rows<Record<string,unknown>>(res).map(rowToDraft);
+}
 export async function getDraft(id: string): Promise<Draft|null> {
   const res = await db()`SELECT * FROM drafts WHERE id=${id}`;
   const r = rows<Record<string,unknown>>(res); return r.length ? rowToDraft(r[0]) : null;

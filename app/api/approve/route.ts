@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDraft, logAction, updateDraft } from '@/lib/db';
+import { approveAndPost } from '@/lib/approve';
 import { verifyActionToken } from '@/lib/tokens';
-import { sendConfirmationEmail } from '@/lib/email';
-import { isDryRun } from '@/lib/env';
-import { postToLinkedIn } from '@/lib/linkedin';
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('token');
@@ -11,17 +8,10 @@ export async function GET(req: NextRequest) {
 
   try {
     const { did } = await verifyActionToken(token, 'approve');
-    const d = await getDraft(did);
-    if (!d) return NextResponse.json({ error: 'Draft not found' }, { status: 404 });
-    if (d.status !== 'pending') {
-      return NextResponse.json({ error: 'Already processed', status: d.status }, { status: 409 });
+    const result = await approveAndPost(did, { allowRetry: false });
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error, status: result.status }, { status: result.code === 'not_found' ? 404 : 409 });
     }
-
-    await updateDraft(did, { status: 'approved' });
-    await logAction(did, 'approved', { dryRun: isDryRun() });
-    await postToLinkedIn(d.content, did);
-    await updateDraft(did, { status: 'posted' });
-    await sendConfirmationEmail(d, isDryRun());
     return NextResponse.redirect(new URL('/thanks', baseRedirect()));
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 403 });
