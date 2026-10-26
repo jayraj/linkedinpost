@@ -40,7 +40,7 @@ const esc = (s: string) =>
 /** Weekly email: 3 suggestions + 1 ready draft + action buttons. */
 export async function sendDraftEmail(
   draft: Draft,
-  links: { approve: string; pick2: string; pick3: string; feedback: string },
+  links: { approve: string; pick2: string; pick3: string; feedback: string; revise: string },
 ): Promise<void> {
   const topicsList = draft.topics
     .map(
@@ -62,15 +62,34 @@ export async function sendDraftEmail(
       <ul style="padding-left:18px;margin:0 0 8px">${topicsList}</ul>
       <h3 style="font-size:15px;margin:20px 0 8px;color:#374151">✍️ Draft post (${esc(draft.chosen_topic)})</h3>
       <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;white-space:pre-wrap;font-size:14px;line-height:1.5">${esc(draft.content)}</div>
-      <p style="font-size:13px;color:#6b7280;margin:16px 0 4px">Approve, swap topic, or give feedback (links expire in 7 days):</p>
+      <p style="font-size:13px;color:#6b7280;margin:16px 0 4px">Approve, swap topic, or tell me what to change (links expire in 7 days):</p>
       ${btn(links.approve, '✅ Approve & Post', '#16a34a')}
       ${btn(links.pick2, '🔄 Try #2 instead', '#2563eb')}
       ${btn(links.pick3, '🔄 Try #3 instead', '#2563eb')}
-      ${btn(links.feedback, '✏️ Give feedback', '#6b7280')}
+      ${reviseHint(links.revise)}
       ${process.env.DRY_RUN !== 'false' ? '<p style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:8px 12px;font-size:13px;margin-top:12px">🧪 <strong>DRY-RUN mode is ON</strong> — approving will simulate the post, not publish it. Set <code>DRY_RUN=false</code> in Vercel to go live.</p>' : ''}
       `,
     ),
   );
+}
+
+/**
+ * Revision card shared by the draft and revision emails. It is real guidance, not just
+ * decoration: the revision prompt instructs the model to treat the author's notes as
+ * direction, so telling them what works makes the rewrite land closer to intent.
+ */
+function reviseHint(href: string): string {
+  return `<div style="margin-top:16px;border:1px solid #e5e7eb;border-left:3px solid #6b7280;border-radius:8px;padding:14px 16px;background:#ffffff">
+        <p style="margin:0 0 6px;font-size:14px;font-weight:600">✏️ Want it changed? Tell me what to fix</p>
+        <p style="margin:0 0 8px;font-size:13px;color:#6b7280">I'll rewrite the post and email you the new version — approve that one when it's right.</p>
+        <ul style="margin:0 0 12px;padding-left:18px;font-size:13px;color:#4b5563">
+          <li>What to change — too long, wrong angle, add a number</li>
+          <li>The story to use — or drop the personal anecdote</li>
+          <li>The takeaway you want readers to act on</li>
+          <li>Ask for a completely different topic — e.g. “write about estimation instead, not AI”</li>
+        </ul>
+        ${btn(href, '✏️ Give feedback / pick another topic', '#6b7280')}
+      </div>`;
 }
 
 export async function sendConfirmationEmail(draft: Draft, dryRun: boolean): Promise<void> {
@@ -84,12 +103,13 @@ export async function sendConfirmationEmail(draft: Draft, dryRun: boolean): Prom
   );
 }
 
-export async function sendFeedbackAckEmail(draft: Draft): Promise<void> {
+export async function sendFeedbackAckEmail(draft: Draft, links: { approve: string; revise: string }): Promise<void> {
   await send('🔄 New draft based on your feedback', shell(
     'Here’s your revised draft',
-    `<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;white-space:pre-wrap;font-size:14px">${esc(draft.content)}</div>
-     <p style="margin-top:16px">${btn(`${baseUrl()}/api/approve?token=PENDING`, '✅ Approve & Post', '#16a34a')}</p>
-     <p style="font-size:13px;color:#6b7280">Use the buttons in the latest draft email to approve — each email carries its own signed links.</p>`,
+    `<p style="font-size:14px;color:#4b5563;margin:0 0 12px">Rewritten to match your notes. Nothing is posted until you approve this version — the older email’s buttons are stale, so use the two below.</p>
+     <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;white-space:pre-wrap;font-size:14px;line-height:1.5">${esc(draft.content)}</div>
+     <p style="margin-top:16px">${btn(links.approve, '✅ Approve & Post', '#16a34a')}${btn(links.revise, '✏️ Give feedback again', '#6b7280')}</p>
+     ${process.env.DRY_RUN !== 'false' ? '<p style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:8px 12px;font-size:13px;margin-top:12px">🧪 <strong>DRY-RUN mode is ON</strong> — approving will simulate the post, not publish it.</p>' : ''}`,
   ));
 }
 
@@ -117,13 +137,17 @@ export async function sendTokenExpiryWarning(daysLeft: number): Promise<void> {
 }
 
 /** Signed action links for one draft version. */
-export async function buildLinks(draft: Draft, tokens: { approve: string; feedback: string }) {
+export async function buildLinks(draft: Draft, tokens: { approve: string; feedback: string; revise?: string }) {
   const base = baseUrl();
+  // Older callers (and already-sent emails) only carry a `feedback` token; the
+  // feedback page checks its own 'feedback' action, so reusing it degrades safely.
+  const revise = tokens.revise ?? tokens.feedback;
   return {
     approve: `${base}/api/approve?token=${tokens.approve}`,
     pick2: `${base}/api/pick?token=${tokens.feedback}&n=2`,
     pick3: `${base}/api/pick?token=${tokens.feedback}&n=3`,
     feedback: `${base}/feedback?token=${tokens.feedback}`,
+    revise: `${base}/feedback?token=${revise}`,
   };
 }
 

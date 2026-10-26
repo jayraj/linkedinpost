@@ -1,7 +1,7 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { env } from './env';
 
-export type TokenAction = 'approve' | 'feedback';
+export type TokenAction = 'approve' | 'feedback' | 'revise';
 
 export interface ActionPayload {
   did: string; // draft id

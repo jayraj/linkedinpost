@@ -21,8 +21,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** Scout + write as one unit so a mid-pipeline capacity spike can be retried whole. */
 async function scoutAndWrite(): Promise<{ topics: Topic[]; content: string }> {
   const topics = await scoutTopics();
-  const content = await writePost(topics[0]);
-  return { topics, content };
+  const written = await writePost(topics[0]);
+  return { topics, content: written.content };
 }
 
 // Vercel cron invokes routes with GET; POST kept for manual triggers (curl/tests).
@@ -58,10 +58,11 @@ async function handle(req: NextRequest) {
     const draft = await createDraft({ weekOf, topics, chosenTopic: chosen.title, content, tokenExpires });
     const approve = await signActionToken(draft.id, 'approve');
     const feedback = await signActionToken(draft.id, 'feedback');
-    const links = await buildLinks(draft, { approve, feedback });
+    const revise = await signActionToken(draft.id, 'revise');
+    const links = await buildLinks(draft, { approve, feedback, revise });
     // 4. Email
     await sendDraftEmail(draft, links);
-    await logAction(draft.id, 'emailed', { dryRun: isDryRun(), links: { ...links, feedback: '[redacted]' } });
+    await logAction(draft.id, 'emailed', { dryRun: isDryRun(), links: { ...links, feedback: '[redacted]', revise: '[redacted]' } });
     return NextResponse.json({ ok: true, draftId: draft.id, weekOf });
   } catch (e) {
     // Always leave a DB trace, even if the alert email itself fails
