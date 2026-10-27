@@ -297,7 +297,9 @@ export const LINKEDIN_AUTHOR_PROFILE = {
 
     "If using metrics, make them believable.",
 
-    "Always leave readers with something practical."
+    "Always leave readers with something practical.",
+
+    "Make the leadership decision visible — what should leaders start, stop, or measure?"
   ],
 
   // ==========================================================================
@@ -378,6 +380,8 @@ export const LINKEDIN_AUTHOR_PROFILE = {
     "Can someone finish reading it in under 90 seconds?",
 
     "Does the ending encourage discussion naturally?",
+
+    "Does this read like a leader making a call, not a practitioner sharing a tip?",
 
     "Would I personally be proud to publish this?"
   ]

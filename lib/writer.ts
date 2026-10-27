@@ -31,6 +31,8 @@ Rules:
 - Writing rules: ${P.writingRules.join(' | ')}
 - Never write: ${P.neverWrite.join(' | ')}
 - Never mention that you are AI.
+- No sign-off: never include the author's name or job title in the post — LinkedIn already shows the byline.
+- Leadership lens: write to heads of engineering. Make the decision, the trade-off, and the organizational consequence explicit. Never sound like a tool tutorial or a practitioner tip.
 - Mentally run this checklist before outputting: ${P.qualityChecklist.join(' | ')}`;
 
 /**
@@ -90,7 +92,6 @@ export async function writePost(
 - Audience: ${[...P.audience.primary, ...P.audience.secondary].join(', ')}
 - Reader goals: ${P.audience.readerGoals.join(', ')}
 - Closing options (pick one that fits): ${P.engagement.closingOptions.join(' | ')}
-- Sign-off: ${P.author.name}, ${P.author.role}
 
 ${topicBrief(topic)}${feedback ? feedbackBlock(feedback, mode) : ''}${retopic ? `
 
